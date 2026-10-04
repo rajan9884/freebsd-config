@@ -1,0 +1,13 @@
+#!/bin/sh
+# start-sway-headless — sway on GPU-less guests (QEMU/QXL, VirtualBox,
+# VMware without 3D, …): software-rendered headless backend.
+# View/control it via wayvnc from a second VT or SSH session:
+#   export XDG_RUNTIME_DIR=/var/run/user/$(id -u)
+#   export WAYLAND_DISPLAY="$(ls "$XDG_RUNTIME_DIR" | grep '^wayland-' | head -1)"
+#   wayvnc 0.0.0.0
+# then point any VNC viewer on the host at guestIP:5900.
+export WLR_BACKENDS=headless
+export WLR_HEADLESS_OUTPUTS=1
+export WLR_LIBINPUT_NO_DEVICES=1
+export WLR_RENDERER_ALLOW_SOFTWARE=1
+exec "$(dirname "$0")/start-sway" "$@"
