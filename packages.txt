@@ -49,6 +49,9 @@ wtype                # x11/wtype
 hyprpicker           # x11/hyprpicker (color picker)
 wf-recorder          # multimedia/wf-recorder (OPTIONAL screen recorder)
 wlr-randr            # x11/wlr-randr (output management)
+wayvnc               # net/wayvnc (VNC server for wlroots; enables headless sway
+                     # in VMs without a DRM/KMS GPU, e.g. QEMU/QXL guests —
+                     # see README "Running in a VM without a GPU")
 
 # ── audio: native OSS + optional PipeWire ──
 pipewire             # multimedia/pipewire (OPTIONAL: desktop audio routing)

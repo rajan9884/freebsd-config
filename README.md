@@ -153,3 +153,26 @@ random-wall.sh, init-wallpaper.sh.
 - Theme not applied: install matugen (cargo install matugen), then run
   sway-wall.sh <image> manually.
 - Installer overwrote a file: see ~/.config-backup-freebsd-<timestamp>/.
+
+## Running in a VM without a GPU (QEMU/QXL, VirtualBox, VMware)
+
+Sway needs a DRM/KMS device (`/dev/dri/card0`). Virtual GPUs such as QXL
+have no FreeBSD DRM driver (drm-kmod dropped vboxvideo/vmwgfx/virtio-gpu,
+and graphics/virtio-gpu-qemu-kmod is framebuffer-only for X11), so on such
+guests plain `start-sway` can never start — this is a platform limit, not a
+config bug. Two working options:
+
+1. Headless sway + wayvnc (keeps this whole config, software-rendered):
+   install wayvnc (`pkg install wayvnc`), then from the console/SSH:
+   `WLR_BACKENDS=headless WLR_HEADLESS_OUTPUTS=1 WLR_LIBINPUT_NO_DEVICES=1
+   WLR_RENDERER_ALLOW_SOFTWARE=1 ~/.local/bin/start-sway`
+   and in a second shell `wayvnc 0.0.0.0` (set a password via ~/.config/
+   wayvnc/config). Connect any VNC viewer on the host to guestIP:5900 —
+   keyboard/mouse come through VNC as virtual input devices.
+2. X11 instead: sway configs are i3-compatible, so `pkg install xorg
+   xf86-video-qxl i3` (or xf86-video-scfb + the virtio-gpu-qemu-kmod port
+   for virtio-gpu guests) gives a working desktop reusing most keybinds.
+
+For the real sway experience use bare metal (Intel/AMD + drm-kmod) or GPU
+passthrough: `pkg install drm-kmod`, `sysrc kld_list+=i915kms` (or amdgpu),
+reboot, verify `ls /dev/dri` shows card0, then `start-sway`.
