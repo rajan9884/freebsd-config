@@ -104,7 +104,9 @@ if [ "$DO_PACKAGES" -eq 1 ]; then
     # exist on this branch (e.g. swayosd, tuigreet on quarterly) is retried
     # individually so one bad name can never fail the whole desktop.
     log "Bootstrapping pkg and installing packages (this takes a while)"
-    "$PRIV" pkg update -f || warn "pkg update reported an error; continuing anyway"
+    # Plain `pkg update` (no -f): refreshes only stale catalogues, so
+    # re-runs are quick. It does run on every invocation by design.
+    "$PRIV" pkg update || warn "pkg update reported an error; continuing anyway"
     _pkgs="$(grep -v '^[[:space:]]*#' "$PACKAGES_FILE" | grep -v '^[[:space:]]*$' | awk '{print $1}')"
     # shellcheck disable=SC2086
     if ! "$PRIV" pkg install -y $_pkgs; then
