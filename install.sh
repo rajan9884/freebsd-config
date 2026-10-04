@@ -164,21 +164,27 @@ if [ "$DO_PACKAGES" -eq 1 ]; then
             cron)    _var="cron_enable" ;;
             pf)      _var="pf_enable" ;;
         esac
-        if "$PRIV" sysrc -n "$_var" >/dev/null 2>&1; then
-            "$PRIV" sysrc "$_var=YES" >/dev/null || warn "sysrc $_var failed"
+        # NOTE: do NOT gate the set on `sysrc -n <var>` — sysrc(8) exits
+        # non-zero when a variable is unset, so on a fresh system the probe
+        # fails and the service would never be enabled. Just set it and
+        # check the exit status of the set itself.
+        if "$PRIV" sysrc "$_var=YES" >/dev/null 2>&1; then
             log "  enabled $_svc ($_var=YES)"
         else
-            warn "sysrc unavailable for $_var; skipping"
+            warn "sysrc $_var failed; run '$PRIV sysrc $_var=YES' manually"
         fi
     done
     unset _svc _var
     # Sensible powerd tunables for a laptop/desktop (AC hiadaptive,
     # battery adaptive). Overwritten only when powerd_flags is unset.
-    if "$PRIV" sysrc -n powerd_flags >/dev/null 2>&1; then
-        if [ -z "$("$PRIV" sysrc -n powerd_flags 2>/dev/null)" ]; then
-            "$PRIV" sysrc 'powerd_flags=-a hiadaptive -b adaptive' >/dev/null || true
-        fi
+    # Same sysrc -n caveat: an unset variable is an error, so capture the
+    # value with `|| true` and treat empty as "needs our default".
+    _powerd_flags="$("$PRIV" sysrc -n powerd_flags 2>/dev/null || true)"
+    if [ -z "$_powerd_flags" ]; then
+        "$PRIV" sysrc 'powerd_flags=-a hiadaptive -b adaptive' >/dev/null 2>&1 \
+            || warn "could not set powerd_flags"
     fi
+    unset _powerd_flags
     # ntpd: sync clock at boot before starting the daemon.
     "$PRIV" sysrc ntpd_sync_on_start=YES >/dev/null 2>&1 || true
     # Bluetooth: base stack, started on demand by the menu scripts.
