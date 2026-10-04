@@ -80,11 +80,15 @@ if [ "$DO_PACKAGES" -eq 1 ]; then
         exit 1
     fi
     log "Privilege escalation: $PRIV (credentials will be requested once)"
-    if ! "$PRIV" -n true 2>/dev/null; then
+    if [ "$PRIV" = "doas" ]; then
+        # doas(1) has no sudo-style -v "validate credentials" flag;
+        # `doas true` prompts once up front and caches (with `permit persist`).
+        doas true
+    elif ! sudo -n true 2>/dev/null; then
         if [ -n "${SUDO_ASKPASS:-}" ]; then
-            "$PRIV" -A -v
+            sudo -A -v
         else
-            "$PRIV" -v
+            sudo -v
         fi
     fi
 fi
