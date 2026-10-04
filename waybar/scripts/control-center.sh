@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────
 #   Control Center (FreeBSD 15.1 port )
-#   Native sources: ifconfig(8) wlan, mixer/wpctl, brightnessctl.
+#   Native sources: ifconfig(8) wlan, mixer/wpctl, freebsd-backlight.
 # ──────────────────────────────────────────────
 
 THEME="$HOME/.config/rofi/control-center.rasi"
@@ -50,12 +50,9 @@ get_vol_bar() {
 }
 
 get_bright_bar() {
-    local cur max percent=0
-    cur=$(brightnessctl g 2>/dev/null || echo 0)
-    max=$(brightnessctl m 2>/dev/null || echo 100)
-    [[ "$cur" =~ ^[0-9]+$ ]] || cur=0
-    [[ "$max" =~ ^[0-9]+$ && "$max" != "0" ]] || max=100
-    percent=$((cur * 100 / max))
+    local percent=0
+    percent=$(~/.local/bin/freebsd-backlight get 2>/dev/null || echo 0)
+    [[ "$percent" =~ ^[0-9]+$ ]] || percent=0
     local filled=$((percent / 10))
     local bar=""
     for ((i=0; i<filled; i++)); do bar+="󰝤"; done
@@ -91,10 +88,10 @@ case "$CHOICE" in
     *"Bluetooth"*)
         ~/.config/waybar/scripts/bluetooth-menu.sh ;;
     *"Brightness"*)
-        brightnessctl set +10% ;;
+        ~/.local/bin/freebsd-backlight up 10 ;;
     *"Sound"*)
-        if command -v pulsemixer >/dev/null 2>&1; then
-            foot --app-id=pulsemixer -e pulsemixer
+        if command -v pavucontrol >/dev/null 2>&1; then
+            pavucontrol
         else
             foot -e sh -c 'mixer; echo; echo "Press Enter to close..."; read -r'
         fi ;;

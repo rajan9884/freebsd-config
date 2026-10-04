@@ -18,7 +18,7 @@
     ],
     "modules-center": [
         "sway/workspaces",
-        "backlight",
+        "custom/backlight",
         "pulseaudio",
         "custom/group"
     ],
@@ -88,19 +88,22 @@
             "4": ["eDP-1"]
         }
     },
-    "backlight": {
-        // FreeBSD backlight node varies by driver (acpi_video0,
-        // intel_backlight, …): list with `brightnessctl -l` and adjust.
-        "device": "intel_backlight",
-        "format": "{icon} {percent}%",
+    "custom/backlight": {
+        // Native waybar backlight is Linux-sysfs only; this polls base
+        // backlight(8) via ~/.local/bin/freebsd-backlight (override node
+        // with BACKLIGHT_DEVICE=<name fragment>; empty on VMs/desktops).
+        "exec": "~/.local/bin/freebsd-backlight waybar",
+        "return-type": "json",
+        "interval": 5,
+        "format": "{icon} {text}",
         "format-icons": [
             "󰃞",
             "󰃟",
             "󰃠"
         ],
-        "on-scroll-up": "brightnessctl set 5%+ >/dev/null",
-        "on-scroll-down": "brightnessctl set 5%- >/dev/null",
-        "tooltip": false
+        "on-scroll-up": "~/.local/bin/freebsd-backlight up 5",
+        "on-scroll-down": "~/.local/bin/freebsd-backlight down 5",
+        "tooltip": true
     },
     "pulseaudio": {
         "format": "{icon} {volume}%",
@@ -115,8 +118,8 @@
             ]
         },
         "scroll-step": 5,
-        "on-click": "foot --app-id=pulsemixer -e pulsemixer",
-        "on-click-right": "pactl set-sink-mute @DEFAULT_SINK@ toggle",
+        "on-click": "pavucontrol || foot -e sh -c 'mixer; echo; echo \"Press Enter to close...\"; read -r'",
+        "on-click-right": "~/.config/sway/scripts/osd-volume.sh mute-toggle",
         "tooltip": false
     },
     "battery": {

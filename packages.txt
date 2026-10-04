@@ -26,17 +26,21 @@ gnome-keyring        # security/gnome-keyring (portal Secret backend)
 wayland              # graphics/wayland (client libs)
 libinput             # x11/libinput (sway input)
 
-# ── login manager (optional but recommended) ──
-greetd               # sysutils/greetd (OPTIONAL: may be absent on quarterly)
-tuigreet             # x11/tuigreet (OPTIONAL greeter UI for greetd)
+# ── login manager ──
+# No greetd/tuigreet/swayosd/brightnessctl/pulsemixer/udisks2/strace ports
+# exist (verified against freebsd-ports):
+#   greeter  -> TTY login + start-sway autostart (shell/zprofile); sddm
+#               (x11/sddm) is a manual opt-in for a graphical greeter.
+#   OSD      -> notify-send fallback is built into osd-*.sh (no port needed).
+#   backlight-> base backlight(8) via bin/freebsd-backlight (no port needed).
+#   automount-> base autofs/automount(8); gvfs covers trash/mtp/smb.
+#   strace   -> base truss(1).
 
 # ── terminal / bar / launcher / notifications ──
 foot                 # x11/foot
 waybar               # x11/waybar
 rofi                 # x11/rofi (Wayland support merged into main port)
 mako                 # x11/mako
-swayosd              # x11/swayosd (OPTIONAL: no-op fallback if missing)
-brightnessctl        # sysutils/brightnessctl
 wlsunset             # x11/wlsunset (night light)
 
 # ── screenshots / clipboard / input ──
@@ -56,8 +60,8 @@ wayvnc               # net/wayvnc (VNC server for wlroots; enables headless sway
 # ── audio: native OSS + optional PipeWire ──
 pipewire             # multimedia/pipewire (OPTIONAL: desktop audio routing)
 wireplumber          # multimedia/wireplumber (OPTIONAL pipewire session manager)
-pulsemixer           # audio/pulsemixer (mixer TUI; works with pipewire-pulse)
-pavucontrol          # audio/pavucontrol (OPTIONAL GTK mixer)
+pamixer              # audio/pamixer (CLI mixer; works with pipewire-pulse)
+pavucontrol          # audio/pavucontrol (GTK mixer)
 
 # ── files / images / documents ──
 nautilus             # x11-fm/nautilus
@@ -65,13 +69,12 @@ sushi                # x11-fm/sushi (OPTIONAL quick preview)
 imv                  # graphics/imv
 evince               # graphics/evince (PDF; "papers" on newer branches)
 gvfs                 # devel/gvfs (trash/mtp/smb for nautilus)
-udisks2              # sysutils/udisks2 (OPTIONAL automount helper)
 gnome-text-editor    # editors/gnome-text-editor
 ImageMagick7         # graphics/ImageMagick7 (magick(1) for wallpaper staging)
-qrencode             # graphics/qrencode (wifi-share QR)
+libqrencode          # graphics/libqrencode (provides qrencode(1) for wifi-share)
 chafa                # graphics/chafa (terminal QR preview)
 tesseract            # graphics/tesseract (OCR)
-tesseract-data-eng   # graphics/tesseract-data (OPTIONAL eng traineddata)
+tesseract-data       # graphics/tesseract-data (traineddata incl. eng)
 
 # ── browser ──
 chromium             # www/chromium (primary; helium-browser has no FreeBSD port)
@@ -108,7 +111,6 @@ gum                  # sysutils/gum (prompt helper for webapp scripts)
 curl                 # ftp/curl
 lsof                 # sysutils/lsof
 psmisc               # sysutils/psmisc (pkill/pidof)
-strace               # devel/strace (OPTIONAL; truss(1) is the base equivalent)
 yt-dlp               # www/yt-dlp
 cava                 # audio/cava (OPTIONAL visualizer)
 
@@ -125,9 +127,11 @@ qt6-wayland          # x11-toolkits/qt6-wayland (OPTIONAL Qt Wayland)
 
 # ── toolchain (for cargo/pip fallbacks: matugen, awww, autotiling) ──
 rust                 # lang/rust (provides cargo for matugen/awww)
-python3              # lang/python3
-py-pillow            # graphics/py-pillow (OCR preprocessing)
+python3              # lang/python3 (unversioned symlinks for the default version)
 node                 # www/node (OPTIONAL)
+# NOTE: Pillow is NOT listed here — ports ship it flavored (py311-pillow,
+# py312-pillow, …). install.sh installs the flavor matching `python3`
+# (see "Python helpers" section) so ocr-extract always gets a working PIL.
 
 # ── privilege / utils ──
 doas                 # security/doas

@@ -59,8 +59,8 @@ exec sh -c 'for i in $(seq 1 60); do s=$(pactl get-default-sink 2>/dev/null) || 
 # activation and screen sharing stays down until retried): wait for the
 # socket, then pre-start the wlr/gtk backends (see portal-warmup.sh).
 exec $swayscripts/portal-warmup.sh
-# Backlight persistence: kernel resets intel_backlight at boot; restore last saved value.
-exec sh -c 'B=$(cat "${XDG_STATE_HOME:-$HOME/.local/state}/backlight" 2>/dev/null); case "$B" in ""|*[!0-9]*) ;; *) brightnessctl -c backlight set "$B" >/dev/null 2>&1 || true;; esac'
+# Backlight persistence: firmware resets the level at boot; restore last saved value.
+exec ~/.local/bin/freebsd-backlight restore
 # Ports install the agent under /usr/local/libexec (Linux: /usr/libexec).
 exec sh -c "if [ -x /usr/local/libexec/polkit-gnome-authentication-agent-1 ]; then exec /usr/local/libexec/polkit-gnome-authentication-agent-1; elif [ -x /usr/libexec/polkit-gnome-authentication-agent-1 ]; then exec /usr/libexec/polkit-gnome-authentication-agent-1; fi"
 # awww is a cargo install on FreeBSD (no port); init-wallpaper.sh falls back

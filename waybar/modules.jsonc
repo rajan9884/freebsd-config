@@ -5,7 +5,7 @@
         "format-icons": {
             "default": ["󰕿", "󰖀", "󰕾"]
         },
-        "on-click": "foot --app-id=pulsemixer -e pulsemixer"
+        "on-click": "pavucontrol || foot -e sh -c 'mixer; echo; echo \"Press Enter to close...\"; read -r'"
     },
 
     "battery": {

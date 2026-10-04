@@ -165,7 +165,7 @@ escape_wifi_qr() {
 }
 
 if ! command -v qrencode >/dev/null 2>&1; then
-  echo "qrencode not found (pkg install qrencode)" >&2
+  echo "qrencode not found (pkg install libqrencode)" >&2
   exit 1
 fi
 

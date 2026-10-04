@@ -1,17 +1,15 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────
 #   Brightness OSD (FreeBSD 15.1 port).
-#   brightnessctl makes the change (exact 5% steps, backlight
-#   class only); swayosd-client renders icon + bar + percentage
-#   when installed, else notify-send. (swayosd's own ±N math is
-#   percent-based and asymmetric — not trustworthy here.)
-#   FreeBSD backlight devices differ by driver (acpi_video0,
-#   intel_backlight, …): `-c backlight` picks the class default;
-#   override with BRIGHTNESSCTL_DEVICE if yours is not first.
+#   freebsd-backlight makes the change (exact 5% steps via base
+#   backlight(8); brightnessctl passthrough on Linux); swayosd-client
+#   renders icon + bar + percentage when installed, else notify-send.
+#   Backlight device varies by driver: set BACKLIGHT_DEVICE to a
+#   /dev/backlight/* name fragment when yours is not probed first.
 # ──────────────────────────────────────────────
 ACTION="$1"
-DEV_ARGS=()
-[ -n "${BRIGHTNESSCTL_DEVICE:-}" ] && DEV_ARGS=(--device="$BRIGHTNESSCTL_DEVICE")
+BL="$HOME/.local/bin/freebsd-backlight"
+[ -x "$BL" ] || BL="freebsd-backlight"
 
 # Keybind-launched scripts may run without a session bus (greetd session
 # without dbus-run-session): recover it from the snapshot file.
@@ -46,26 +44,21 @@ osd() { # osd <fraction> <text>
 }
 
 case "$ACTION" in
-    up) brightnessctl "${DEV_ARGS[@]}" -c backlight set 5%+ >/dev/null 2>&1 ;;
-    down) brightnessctl "${DEV_ARGS[@]}" -c backlight set 5%- >/dev/null 2>&1 ;;
-    max) brightnessctl "${DEV_ARGS[@]}" -c backlight set 100% >/dev/null 2>&1 ;;
-    min) brightnessctl "${DEV_ARGS[@]}" -c backlight set 1% >/dev/null 2>&1 ;;
+    up) "$BL" up 5 ;;
+    down) "$BL" down 5 ;;
+    max) "$BL" set 100 ;;
+    min) "$BL" set 1 ;;
 esac
 
-INFO=$(brightnessctl "${DEV_ARGS[@]}" -c backlight -m 2>/dev/null | head -1)
-if [[ -z "$INFO" ]]; then
+PCT="$("$BL" get 2>/dev/null)"
+[[ "$PCT" =~ ^[0-9]+$ ]] || PCT=0
+if [ "$PCT" = "0" ] && ! ls /dev/backlight 2>/dev/null | grep -q . \
+    && ! command -v brightnessctl >/dev/null 2>&1; then
     osd 0 "No backlight"
     exit 0
 fi
-CUR=$(printf '%s' "$INFO" | cut -d, -f3)
-MAXV=$(printf '%s' "$INFO" | cut -d, -f5)
-PCT=$(printf '%s' "$INFO" | cut -d, -f4 | tr -d '%')
-[[ "$CUR" =~ ^[0-9]+$ ]] || CUR=0
-[[ "$MAXV" =~ ^[0-9]+$ && "$MAXV" != "0" ]] || MAXV=100
-[[ "$PCT" =~ ^[0-9]+$ ]] || PCT=0
-FRAC=$(awk -v c="$CUR" -v m="$MAXV" 'BEGIN{ f=(m>0)?c/m:0; if (f>1) f=1; if (f<0) f=0; printf "%.2f", f }')
+FRAC=$(awk -v p="$PCT" 'BEGIN{ f=p/100; if (f>1) f=1; if (f<0) f=0; printf "%.2f", f }')
 
 osd "$FRAC" "$PCT%"
-# Persist raw value for login restore (see sway config backlight-restore).
-mkdir -p "${XDG_STATE_HOME:-$HOME/.local/state}" 2>/dev/null
-printf '%s\n' "$CUR" > "${XDG_STATE_HOME:-$HOME/.local/state}/backlight" 2>/dev/null || true
+# Persist level for login restore (see sway config backlight-restore).
+"$BL" save

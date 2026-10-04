@@ -100,9 +100,12 @@ if [ "$DO_PACKAGES" -eq 1 ]; then
         exit 1
     fi
     # Bootstrap pkg(8) non-interactively, then install best-effort:
-    # try one bulk install first (fast path); any package that does not
-    # exist on this branch (e.g. swayosd, tuigreet on quarterly) is retried
-    # individually so one bad name can never fail the whole desktop.
+    # try one bulk install first (fast path); any name that does not
+    # exist on this branch is retried individually so one bad name can
+    # never fail the whole desktop. NOTE: pkg names must be exact —
+    # there is no greetd/tuigreet/swayosd/brightnessctl/pulsemixer/
+    # udisks2/strace port, qrencode ships as libqrencode, tesseract
+    # data as tesseract-data (see packages.txt header).
     log "Bootstrapping pkg and installing packages (this takes a while)"
     # Plain `pkg update` (no -f): refreshes only stale catalogues, so
     # re-runs are quick. It does run on every invocation by design.
@@ -139,6 +142,21 @@ if [ "$DO_PACKAGES" -eq 1 ]; then
         fi
     fi
     # Python helpers with no (stable) port names.
+    # Pillow ships flavored (py311-pillow, py312-pillow, …): install the
+    # flavor matching the active `python3` so ocr-extract's PIL import works.
+    if command -v python3 >/dev/null 2>&1; then
+        if ! python3 -c 'import PIL.Image' >/dev/null 2>&1; then
+            _pyv="$(python3 -c 'import sys; print("%d%d" % (sys.version_info[0], sys.version_info[1]))' 2>/dev/null || true)"
+            if [ -n "$_pyv" ]; then
+                log "Installing py${_pyv}-pillow to match python3 (OCR preprocessing)"
+                "$PRIV" pkg install -y "py${_pyv}-pillow" \
+                    || warn "py${_pyv}-pillow install failed; OCR preprocessing will be skipped"
+            fi
+            unset _pyv
+        fi
+    else
+        warn "python3 not found (pkg install python3); OCR preprocessing will be skipped"
+    fi
     if ! command -v autotiling >/dev/null 2>&1; then
         if command -v pip >/dev/null 2>&1 || command -v pip3 >/dev/null 2>&1; then
             log "Installing autotiling via pip (best effort)"
@@ -274,7 +292,7 @@ EOF
         done
         unset _desk
     else
-        warn "tuigreet not installed; skipping greetd config (install x11/tuigreet or log in on TTY)"
+        warn "tuigreet not installed (no FreeBSD port); skipping greetd config (TTY login + start-sway is the login flow)"
     fi
     # PipeWire on FreeBSD runs as a per-user service launched from sway's
     # autostart (see sway/config) — no system-wide /etc/pipewire drop-ins

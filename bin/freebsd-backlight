@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# ──────────────────────────────────────────────
+#   freebsd-backlight — portable screen/keyboard backlight control.
+#   FreeBSD: base backlight(8) over /dev/backlight/* (0–100 percent).
+#   Linux: passthrough to brightnessctl when backlight(8) is absent.
+#   Never fails the caller: no backlight device (VMs, desktops) is a
+#   silent no-op success so keybinds and waybar never error.
+#   Usage: freebsd-backlight get|max|set PCT|up [STEP]|down [STEP]|
+#                               dim PCT|restore|save|waybar [--device DEV]
+#   Env: BACKLIGHT_DEVICE (name or /dev/backlight path), BACKLIGHT_STEP (default 5),
+#        XDG_STATE_HOME (persist file for dim/restore/login-restore).
+# ──────────────────────────────────────────────
+set -u
+STEP="${BACKLIGHT_STEP:-5}"
+DEV_REQ="${BACKLIGHT_DEVICE:-${BRIGHTNESSCTL_DEVICE:-}}"
+STATE_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/backlight-pct"
+
+# --device may trail the verb (waybar) — parse argv before dispatch.
+CMD="${1:-get}"; ARG2="${2:-}"
+for _a in "$@"; do
+    case "$_a" in
+        --device=*) DEV_REQ="${_a#--device=}" ;;
+        --device) _next_dev=1 ;;
+        *)
+            if [ "${_next_dev:-0}" = "1" ]; then DEV_REQ="$_a"; _next_dev=0; fi ;;
+    esac
+done
+unset _a _next_dev
+
+_have_backlight8() { command -v backlight >/dev/null 2>&1; }
+
+# Resolve a device name to /dev/backlight/<name>. Empty request = first
+# non-keyboard node (get/set/up/down); kbd callers pass --device.
+_resolve_dev() { # _resolve_dev [want] -> prints path or nothing
+    local want="${1:-}" d lwant
+    if [ -n "$want" ]; then
+        case "$want" in
+            /dev/*) [ -e "$want" ] && { printf '%s' "$want"; return 0; } ;;
+        esac
+        lwant="$(printf '%s' "$want" | tr 'A-Z' 'a-z')"
+        for d in /dev/backlight/*; do
+            [ -e "$d" ] || continue
+            case "$(basename "$d" | tr 'A-Z' 'a-z')" in
+                *"$lwant"*) printf '%s' "$d"; return 0 ;;
+            esac
+        done
+        return 1
+    fi
+    for d in /dev/backlight/*; do
+        [ -e "$d" ] || continue
+        case "$(basename "$d" | tr 'A-Z' 'a-z')" in
+            *kbd*|*keyboard*) continue ;;
+            *) printf '%s' "$d"; return 0 ;;
+        esac
+    done
+    # Screen node absent (VM/desktop): fall back to any node.
+    for d in /dev/backlight/*; do
+        [ -e "$d" ] && { printf '%s' "$d"; return 0; }
+    done
+    return 1
+}
+
+_bsd_get() { # _bsd_get <devpath> -> prints 0-100 or nothing
+    local out
+    out="$(backlight -f "$1" 2>/dev/null)" || return 1
+    out="$(printf '%s' "$out" | grep -oE '[0-9]+' | head -1)"
+    case "$out" in ''|*[!0-9]*) return 1 ;; *) printf '%s' "$out" ;; esac
+}
+
+_bsd_set() { # _bsd_set <devpath> <pct>
+    local p="$2"
+    case "$p" in ''|*[!0-9]*) return 1 ;; esac
+    [ "$p" -gt 100 ] && p=100
+    backlight -f "$1" "$p" >/dev/null 2>&1
+}
+
+# brightnessctl passthrough (Linux reuse): map our verbs onto it.
+_ctl_get() {
+    local info
+    info="$(brightnessctl ${DEV_REQ:+--device="$DEV_REQ"} -m 2>/dev/null | head -1)" || return 1
+    [ -n "$info" ] || return 1
+    printf '%s' "$info" | cut -d, -f4 | tr -d '%'
+}
+_ctl_set() { brightnessctl ${DEV_REQ:+--device="$DEV_REQ"} -c backlight set "$1" >/dev/null 2>&1; }
+
+_persist() {
+    mkdir -p "$(dirname "$STATE_FILE")" 2>/dev/null
+    printf '%s\n' "$1" > "$STATE_FILE" 2>/dev/null || true
+}
+
+_cmd_get() {
+    local v dev
+    if _have_backlight8; then
+        dev="$(_resolve_dev "$DEV_REQ")" || { echo 0; return 0; }
+        v="$(_bsd_get "$dev")" || v=0
+        printf '%s\n' "$v"
+    elif command -v brightnessctl >/dev/null 2>&1; then
+        v="$(_ctl_get)" || v=0
+        case "$v" in ''|*[!0-9]*) v=0 ;; esac
+        printf '%s\n' "$v"
+    else
+        echo 0
+    fi
+}
+
+_cmd_set() { # _cmd_set <pct> [nosave]
+    local p="${1:-}" dev v
+    p="${p%%%}"
+    case "$p" in ''|*[!0-9]*) return 0 ;; esac
+    if _have_backlight8; then
+        dev="$(_resolve_dev "$DEV_REQ")" || return 0
+        _bsd_set "$dev" "$p" || return 0
+        if [ "${2:-}" != "nosave" ]; then
+            v="$(_bsd_get "$dev" 2>/dev/null)" || v="$p"
+            _persist "$v"
+        fi
+    elif command -v brightnessctl >/dev/null 2>&1; then
+        _ctl_set "$p%" || return 0
+        if [ "${2:-}" != "nosave" ]; then
+            v="$(_ctl_get 2>/dev/null)" || v="$p"
+            _persist "$v"
+        fi
+    fi
+    return 0
+}
+
+_cmd_step() { # _cmd_step <up|down> [step]
+    local dir="$1" st="${2:-$STEP}" cur
+    case "$st" in ''|*[!0-9]*) st="$STEP" ;; esac
+    cur="$(_cmd_get)"
+    case "$cur" in ''|*[!0-9]*) cur=0 ;; esac
+    if [ "$dir" = "up" ]; then cur=$((cur + st)); else cur=$((cur - st)); fi
+    [ "$cur" -gt 100 ] && cur=100
+    [ "$cur" -lt 1 ] && cur=1
+    _cmd_set "$cur" >/dev/null
+}
+
+case "$CMD" in
+    get) _cmd_get ;;
+    max) echo 100 ;;
+    set) _cmd_set "$ARG2" >/dev/null ;;
+    up) _cmd_step up "$ARG2" ;;
+    down) _cmd_step down "$ARG2" ;;
+    save) _persist "$(_cmd_get)" ;;                       # persist level for login-restore
+    restore)                                              # sway login / swayidle resume
+        if [ -s "$STATE_FILE" ]; then
+            _cmd_set "$(cat "$STATE_FILE" 2>/dev/null)" >/dev/null
+        fi ;;
+    dim) # swayidle: remember current level (persisted), then drop without persisting.
+        _persist "$(_cmd_get)"
+        _cmd_set "${ARG2:-10}" nosave >/dev/null ;;
+    waybar) # {"text","percentage"} for the waybar custom/backlight module.
+        if _have_backlight8 && ! _resolve_dev "$DEV_REQ" >/dev/null 2>&1 \
+           && ! command -v brightnessctl >/dev/null 2>&1; then
+            printf '{"text":"—","tooltip":"no backlight device","percentage":0}\n'
+        else
+            _p="$(_cmd_get)"
+            case "$_p" in ''|*[!0-9]*) _p=0 ;; esac
+            printf '{"text":"%s%%","tooltip":"backlight %s%%","percentage":%s}\n' "$_p" "$_p" "$_p"
+        fi ;;
+    *) echo "usage: freebsd-backlight get|max|set PCT|up [N]|down [N]|dim PCT|restore|save|waybar [--device DEV]" >&2; exit 2 ;;
+esac

@@ -40,7 +40,8 @@ Partial runs:
     ./install.sh --no-wallpapers   # skip the wallpaper collection download
 
 Reboot after the first run so group membership (video, operator) and the
-greetd login manager take effect.
+devfs backlight/drm rules take effect (login is TTY + start-sway autostart;
+greetd/tuigreet have no FreeBSD ports — sddm is a manual opt-in).
 
 ## What the installer does
 
@@ -48,11 +49,11 @@ greetd login manager take effect.
    so branch-missing optionals never fail the run), then cargo fallbacks
    (matugen, awww) and pip helpers (autotiling, rofimoji).
 2. Services: sysrc + service for dbus, seatd, powerd (+flags), ntpd, cron,
-   pf, bluetooth, and greetd when installed.
+   pf, and bluetooth (no greetd port exists; TTY login + autostart covers it).
 3. Firewall: system/pf.conf to /etc/pf.conf (backup + pfctl -n validate).
 4. Device access: system/devfs.rules freebsd_config ruleset activation.
-5. Login manager: /etc/greetd/config.toml (tuigreet on VT8, ports paths)
-   + sway.desktop dbus-run-session patch.
+5. Login: sway.desktop dbus-run-session patch + start-sway autostart on ttyv.
+   (install.sh still writes /etc/greetd/config.toml if tuigreet ever appears.)
 6. Privilege: wheel sudoers drop-in, doas.conf, pw groupmod wheel/video/operator.
 7. Dotfiles: symlinks into ~/.config, ~/, ~/.local/bin (with arch-compat
    shims); backups to ~/.config-backup-freebsd-<timestamp>/.
@@ -104,8 +105,9 @@ random-wall.sh, init-wallpaper.sh.
 - SSH keys: github-work / github-personal host aliases in ~/.ssh/config.
 - Passwordless menus: add to /usr/local/etc/doas.conf:
   permit nopass :wheel cmd shutdown  (+ cmd zzz).
-- Backlight node: brightnessctl -l, then set BRIGHTNESSCTL_DEVICE or the
-  waybar device (default intel_backlight).
+- Backlight node: ls /dev/backlight, then set BACKLIGHT_DEVICE=<name
+  fragment> (default: first non-keyboard node; waybar polls
+  freebsd-backlight, so no per-driver config needed).
 
 ## Shell notes
 
@@ -131,20 +133,20 @@ random-wall.sh, init-wallpaper.sh.
 | chrony/cronie | base ntpd/cron |
 | ALSA + ~/.asoundrc | OSS (mixer) + optional PipeWire |
 | udevadm, /sys, flock, grep -P, shuf, stat -c, readlink -f, sed -i, mktemp -t, sha256sum, pidof | devd/sysctl, mkdir locks, grep -E, awk+sort, stat -f, realpath, sed -i '', portable mktemp, sha256, pgrep |
-| greetd VT7, /usr/sbin paths | tuigreet VT8, /usr/local paths |
+| greetd VT7, /usr/sbin paths | TTY login + start-sway, /usr/local paths |
 | TTY /dev/tty1, XDG_VTNR | /dev/ttyv0/ttyv1 (Linux names matched too) |
 | Void logo (waybar) | FreeBSD logo (waybar, fastfetch) |
 | arch-* helper names | freebsd-* (+ compat shims) |
 | helium-browser | chromium port (wrapper fallback) |
 | awww/matugen via xbps | cargo install (swaybg fallback) |
 | autotiling/rofimoji via xbps | pip install --user |
-| SwayOSD, bluetoothctl, voxtype | optional; callers degrade gracefully |
+| SwayOSD/greetd/tuigreet/brightnessctl/pulsemixer/udisks2/strace, bluetoothctl, voxtype | no ports; callers degrade gracefully (notify-send, TTY login, backlight(8), truss) |
 | snd-perms runit service | deleted (no udev/ALSA coldplug) |
 
 ## Troubleshooting
 
-- No graphical login: service greetd status; check /etc/greetd/config.toml.
-  Without greetd, log in on TTY and start-sway runs automatically.
+- No graphical login: expected — there is no greetd port. Log in on TTY
+  and start-sway runs automatically (or pkg install sddm for a greeter).
 - Sway cannot start: groups (id -nG, need video), kldstat (GPU drm),
   XDG_RUNTIME_DIR (start-sway creates it when missing).
 - No audio: mixer vol / cat /dev/sndstat for OSS; ps -x | grep pipewire

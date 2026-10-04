@@ -7,7 +7,10 @@
 #   sysrc 'powerd_flags=-a hiadaptive -b adaptive'
 #   sysrc ntpd_enable=YES ntpd_sync_on_start=YES cron_enable=YES
 #   sysrc pf_enable=YES devfs_system_ruleset=freebsd_config
-#   sysrc bluetooth_enable=YES greetd_enable=YES   # greetd only if installed
+#   sysrc bluetooth_enable=YES
+#   # Graphical greeter (no greetd/tuigreet ports exist; manual opt-in only):
+#   # pkg install sddm && sysrc sddm_enable=YES
+#   # Otherwise TTY login + start-sway autostart (shell/zprofile) is the login flow.
 #
 # Graphics (pick ONE driver; also add to /boot/loader.conf):
 #   sysrc kld_list+="i915kms"        # Intel (13th-gen Iris Xe and similar)
@@ -30,4 +33,6 @@ cron_enable="YES"
 pf_enable="YES"
 devfs_system_ruleset="freebsd_config"
 bluetooth_enable="YES"
-greetd_enable="YES"
+# No greetd_enable here: greetd/tuigreet have no FreeBSD ports.
+# TTY login + start-sway autostart is the default flow; for a graphical
+# greeter: pkg install sddm && sysrc sddm_enable=YES.

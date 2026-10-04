@@ -9,6 +9,7 @@ add path 'drm/*' mode 0666 group video
 add path 'input/*' mode 0660 group video
 add path 'dsp*' mode 0666
 add path 'mixer*' mode 0666
+add path 'backlight/*' mode 0660 group video
 add path 'sndstat' mode 0444
 add path 'usb/*' mode 0660 group operator
 add path 'video*' mode 0660 group video

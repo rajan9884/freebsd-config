@@ -105,7 +105,7 @@ window#waybar {
     padding-left: 5px;
     padding-right: 10px;    
 }
-#backlight {
+#custom-backlight {
     padding-left: 10px;
 }
 #pulseaudio {
@@ -130,7 +130,7 @@ window#waybar {
     padding: 4px 2px;
     margin: 6px 0;
 }
-#backlight, #pulseaudio {
+#custom-backlight, #pulseaudio {
 
     padding: 4px 6px;
     margin: 6px 0;

@@ -96,18 +96,18 @@ window#waybar {
     -gtk-icon-effect: dim;
 }
 
-#pulseaudio, #battery, #backlight, #bluetooth, #custom-wifi, #custom-notifications, #custom-record, #custom-voxtype {
+#pulseaudio, #battery, #custom-backlight, #bluetooth, #custom-wifi, #custom-notifications, #custom-record, #custom-voxtype {
     padding: 0 8px;
     margin: 4px 1px;
     border-radius: 10px;
     transition: all 200ms ease;
 }
 
-#backlight:hover, #bluetooth:hover, #custom-wifi:hover, #custom-notifications:hover, #pulseaudio:hover, #battery:hover, #custom-record:hover, #custom-voxtype:hover {
+#custom-backlight:hover, #bluetooth:hover, #custom-wifi:hover, #custom-notifications:hover, #pulseaudio:hover, #battery:hover, #custom-record:hover, #custom-voxtype:hover {
     background: alpha(@primary, 0.12);
 }
 
-#backlight {
+#custom-backlight {
     color: @primary;
 }
 

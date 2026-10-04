@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────
-#   Keyboard-backlight OSD via swayosd-server.
-#   `cycle` wraps max → off (brightnessctl has no wrap for kbd).
+#   Keyboard-backlight OSD (FreeBSD 15.1 port).
+#   freebsd-backlight drives the kbd node (base backlight(8) on FreeBSD,
+#   brightnessctl passthrough on Linux); swayosd-client renders when
+#   installed, else notify-send. `cycle` wraps max → off. No kbd node
+#   (most desktops/VMs) is a silent no-op — the key never errors.
 # ──────────────────────────────────────────────
 ACTION="$1"
-DEV="*kbd*"
+BL="$HOME/.local/bin/freebsd-backlight"
+[ -x "$BL" ] || BL="freebsd-backlight"
+# Keyboard node name fragment for the helper (--device does substring match
+# against /dev/backlight/*; brightnessctl device globs pass through on Linux).
+DEV_ARGS=(--device kbd)
 
 # Keybind-launched scripts may run without a session bus (greetd session
 # without dbus-run-session): recover it from the snapshot file.
@@ -19,24 +26,30 @@ if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
     unset _busf
 fi
 
+_have_kbd() { # kbd node present?
+    [ -d /dev/backlight ] && ls /dev/backlight 2>/dev/null | grep -qiE 'kbd|keyboard'
+}
+
 case "$ACTION" in
-    up) brightnessctl --device="$DEV" set 1+ >/dev/null 2>&1 ;;
-    down) brightnessctl --device="$DEV" set 1- >/dev/null 2>&1 ;;
+    up) "$BL" up 34 "${DEV_ARGS[@]}" ;;
+    down) "$BL" down 34 "${DEV_ARGS[@]}" ;;
     cycle)
-        LEVEL=$(brightnessctl --device="$DEV" get 2>/dev/null)
-        MAX=$(brightnessctl --device="$DEV" max 2>/dev/null)
-        if [[ "$LEVEL" =~ ^[0-9]+$ && "$MAX" =~ ^[0-9]+$ ]] && ((MAX > 0)) && ((LEVEL >= MAX)); then
-            brightnessctl --device="$DEV" set 0 >/dev/null 2>&1
+        LEVEL="$("$BL" get "${DEV_ARGS[@]}" 2>/dev/null)"
+        if [[ "$LEVEL" =~ ^[0-9]+$ ]] && ((LEVEL >= 100)); then
+            "$BL" set 0 "${DEV_ARGS[@]}"
         else
-            brightnessctl --device="$DEV" set 1+ >/dev/null 2>&1
+            "$BL" up 34 "${DEV_ARGS[@]}"
         fi
         ;;
 esac
 
-# swayosd-client is optional on FreeBSD (no port guarantee): never fail the key.
+# swayosd-client is optional on FreeBSD (no port): never fail the key.
+if ! _have_kbd && ! command -v brightnessctl >/dev/null 2>&1; then
+    exit 0
+fi
 if command -v swayosd-client >/dev/null 2>&1; then
-    swayosd-client --brightness=+0 --device "$DEV" 2>/dev/null || true
+    swayosd-client --brightness=+0 --device kbd 2>/dev/null || true
 else
-    LEVEL_NOW=$(brightnessctl --device="$DEV" get 2>/dev/null || echo "?")
-    notify-send -a "Keyboard" -i keyboard-brightness "Keyboard brightness: $LEVEL_NOW" 2>/dev/null || true
+    LEVEL_NOW="$("$BL" get "${DEV_ARGS[@]}" 2>/dev/null || echo "?")"
+    notify-send -a "Keyboard" -i keyboard-brightness "Keyboard brightness: $LEVEL_NOW%" 2>/dev/null || true
 fi
