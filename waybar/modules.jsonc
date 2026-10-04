@@ -1,0 +1,105 @@
+{
+    "pulseaudio": {
+        "format": "{icon}",
+        "format-muted": "󰖁",
+        "format-icons": {
+            "default": ["󰕿", "󰖀", "󰕾"]
+        },
+        "on-click": "foot --app-id=pulsemixer -e pulsemixer"
+    },
+
+    "battery": {
+        // FreeBSD: single system battery via hw.acpi.battery (BAT0, no adapter node).
+        "bat": "BAT0",
+        "interval": 60,
+        "states": {
+            "good": 80,
+            "warning": 30,
+            "critical": 15
+        },
+        "format": "{icon}",
+        "format-charging": "󰂄",
+        "format-plugged": "󰂄",
+        "format-icons": ["󰂎", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"]
+    },
+
+    "tray": {
+        "icon-size": 18,
+        "spacing": 10
+    },
+
+    "custom/power": {
+        "format": "󰐥",
+        "on-click": "~/.config/waybar/scripts/power-menu.sh",
+        "align": 0.5,
+        "tooltip": false
+    },
+
+    "custom/record": {
+        "exec": "~/.config/waybar/scripts/recorder.sh",
+        "return-type": "json",
+        "interval": 2,
+        "on-click": "~/.config/waybar/scripts/recorder.sh toggle",
+        "align": 0.5
+    },
+
+    "custom/voxtype": {
+        "exec": "~/.config/waybar/scripts/voxtype.sh",
+        "return-type": "json",
+        "interval": 2,
+        "on-click": "voxtype record stop",
+        "align": 0.5
+    },
+
+    "custom/group": {
+        "exec": "~/.config/waybar/scripts/group-indicator.sh",
+        "return-type": "json",
+        "interval": 2,
+        "tooltip": true
+    },
+
+    "custom/clipboard": {
+        "format": "",
+        "on-click": "~/.local/bin/menu-clipboard",
+        "tooltip": "Clipboard history (SUPER+CTRL+V)"
+    },
+
+    "custom/vpn": {
+        "exec": "~/.config/waybar/scripts/vpn-status.sh",
+        "return-type": "json",
+        "interval": 10,
+        "on-click": "~/.config/waybar/scripts/wifi-menu.sh",
+        "tooltip": true
+    },
+
+    "custom/notifications": {
+        "exec": "~/.config/waybar/scripts/notifications.sh",
+        "return-type": "json",
+        "interval": 5,
+        "signal": 15,
+        "on-click": "~/.config/sway/scripts/mako-dnd.sh toggle",
+        "on-click-right": "makoctl dismiss -a",
+        "tooltip": true
+    },
+
+    "mpris": {
+        "format": "{player_icon} {dynamic}",
+        "format-paused": "{status_icon} {dynamic}",
+        "player-icons": {
+            "default": "󰐊",
+            "spotify": "󰓇",
+            "firefox": "󰈹",
+            "chromium": "󰖟",
+            "mpv": "󰐊"
+        },
+        "status-icons": {
+            "playing": "󰏤",
+            "paused": "󰐊",
+            "stopped": "󰓛"
+        },
+        "max-length": 30,
+        "on-click": "playerctl play-pause",
+        "on-click-right": "playerctl next",
+        "tooltip": true
+    }
+}

@@ -1,0 +1,15 @@
+# ~/.zprofile — freebsd-config (FreeBSD 15.1 desktop).
+#
+# Executed by zsh for login shells.
+
+# Autostart sway on the first virtual terminal.
+# Linux VTs are /dev/tty1 (+$XDG_VTNR); FreeBSD VTs are /dev/ttyv0-ttyv7
+# ($XDG_VTNR is unset under a TTY login, hence the explicit ttyv match).
+if [ -z "$WAYLAND_DISPLAY" ]; then
+    case "$(tty 2>/dev/null)" in
+        /dev/tty1|/dev/ttyv0|/dev/ttyv1) exec start-sway ;;
+    esac
+    if [ "${XDG_VTNR:-}" = "1" ]; then
+        exec start-sway
+    fi
+fi

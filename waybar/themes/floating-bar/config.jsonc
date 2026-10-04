@@ -1,0 +1,178 @@
+{
+    "include": [
+        "~/.config/waybar/modules.jsonc"
+    ],
+    "layer": "top",
+    "position": "top",
+    "mod": "dock",
+    "exclusive": true,
+    "passthrough": false,
+    "gtk-layer-shell": true,
+    "height": 36,
+    "margin-top": 6,
+    "margin-left": 8,
+    "margin-right": 8,
+
+    "modules-left": [
+        "custom/launcher",
+        "custom/record",
+        "custom/voxtype",
+        "sway/workspaces"
+    ],
+
+    "modules-center": [
+        "clock"
+    ],
+
+    "modules-right": [
+        "tray",
+        "custom/separator",
+        "custom/wifi",
+        "custom/separator2",
+        "bluetooth",
+        "custom/separator3",
+        "backlight",
+        "custom/separator4",
+        "custom/notifications",
+        "custom/separator5",
+        "pulseaudio",
+        "custom/separator6",
+        "battery",
+        "custom/separator7",
+        "custom/power"
+    ],
+
+    "custom/launcher": {
+        // FreeBSD daemon logo  (was the Void logo on Linux)
+        "format": "",
+        "on-click": "rofi -show drun -theme ~/.config/rofi/active-launcher.rasi",
+        "tooltip": false
+    },
+
+    "custom/separator": {
+        "format": "│",
+        "tooltip": false
+    },
+
+    "custom/separator2": {
+        "format": "│",
+        "tooltip": false
+    },
+
+    "custom/separator3": {
+        "format": "│",
+        "tooltip": false
+    },
+
+    "custom/separator4": {
+        "format": "│",
+        "tooltip": false
+    },
+
+    "custom/separator5": {
+        "format": "│",
+        "tooltip": false
+    },
+
+    "custom/separator6": {
+        "format": "│",
+        "tooltip": false
+    },
+
+    "custom/separator7": {
+        "format": "│",
+        "tooltip": false
+    },
+
+    "sway/workspaces": {
+        "format": "{icon}",
+        "format-icons": {
+            "1": "1",
+            "2": "2",
+            "3": "3",
+            "4": "4",
+            "5": "5",
+            "urgent": "",
+            "focused": "●"
+        },
+        "on-click": "activate",
+        "all-outputs": true
+    },
+
+    "pulseaudio": {
+        "format": "{icon} {volume}%",
+        "format-muted": "󰖁 Muted",
+        "format-bluetooth": "{icon} {volume}%",
+        "format-bluetooth-muted": "󰖁 Muted",
+        "format-icons": {
+            "default": ["󰕿", "󰖀", "󰕾"]
+        },
+        "scroll-step": 5,
+        "on-click": "foot --app-id=pulsemixer -e pulsemixer",
+        "on-click-right": "pactl set-sink-mute @DEFAULT_SINK@ toggle"
+    },
+
+    "backlight": {
+        // FreeBSD backlight node varies by driver (acpi_video0,
+        // intel_backlight, …): list with `brightnessctl -l` and adjust.
+        "device": "intel_backlight",
+        "format": "{icon} {percent}%",
+        "format-icons": ["󰃞", "󰃟", "󰃠"],
+        "on-scroll-up": "brightnessctl set 5%+ >/dev/null",
+        "on-scroll-down": "brightnessctl set 5%- >/dev/null",
+        "tooltip": false
+    },
+
+    "custom/wifi": {
+        "exec": "~/.config/waybar/scripts/wifi-status.sh",
+        "return-type": "json",
+        "interval": 5,
+        "on-click": "~/.config/waybar/scripts/wifi-menu.sh",
+        "signal": 14,
+        "tooltip": true
+    },
+
+    "bluetooth": {
+        "format": "󰂯",
+        "format-disabled": "󰂲",
+        "format-off": "󰂲",
+        "format-on": "󰂯",
+        "format-connected": "󰂱",
+        "on-click": "~/.config/waybar/scripts/bluetooth-menu.sh",
+        "tooltip": true,
+        "tooltip-format": "{status}"
+    },
+
+    "custom/notifications": {
+        "exec": "~/.config/waybar/scripts/notifications.sh",
+        "return-type": "json",
+        "interval": 5,
+        "signal": 15,
+        "on-click": "~/.config/sway/scripts/mako-dnd.sh toggle",
+        "on-click-right": "makoctl dismiss -a",
+        "tooltip": true
+    },
+
+    "battery": {
+        // FreeBSD reports one system battery (hw.acpi.battery.life):
+        // BAT0 is the portable pick; there is no ADP0 adapter node here.
+        "bat": "BAT0",
+        "interval": 30,
+        "states": {
+            "good": 80,
+            "warning": 30,
+            "critical": 15
+        },
+        "format": "{capacity}% {icon}",
+        "format-charging": "{capacity}% 󱐋",
+        "format-plugged": "{capacity}% 󱐋",
+        "format-icons": ["󰂎", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"],
+        "on-click": "~/.local/bin/power-profiles menu"
+    },
+
+    "clock": {
+        "format": "{:%I:%M %p}",
+        "format-alt": "{:%a, %b %d}",
+        "tooltip-format": "<tt><small>{calendar}</small></tt>"
+    }
+}

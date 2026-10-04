@@ -1,0 +1,143 @@
+# freebsd-config — pkg(8) package set for FreeBSD 15.1 (amd64/aarch64).
+# Install with:  sudo pkg install $(grep -v '^[[:space:]]*#' packages.txt | grep -v '^[[:space:]]*$' | tr '\n' ' ')
+# Lines starting with # are comments. Entries marked OPTIONAL may fail on
+# quarterly branches — the installer continues past missing optionals.
+#
+# FreeBSD naming convention: all names are lowercase pkg names
+# (ports origin shown in trailing comments). Linux-only Void packages have
+# been replaced: NetworkManager -> native wlan(4)+wpa_supplicant(8),
+# ufw/nftables -> pf(4), cronie -> base cron(8), chrony -> base ntpd(8),
+# elogind -> seatd, alsa-* -> native oss(4)/mixer(8)+optional pipewire,
+# power-profiles-daemon -> base powerd(8).
+
+# ── compositor + Wayland session ──
+swayfx               # x11-wm/swayfx (sway eye-candy fork; conflicts with sway)
+swaybg               # x11/swaybg (fallback painter when awww is absent)
+swayidle             # x11/swayidle
+swaylock             # x11/swaylock
+seatd                # sysutils/seatd (seat management; enables sway without root)
+dbus                 # devel/dbus (session bus)
+polkit               # sysutils/polkit
+polkit-gnome         # sysutils/polkit-gnome (auth agent)
+xdg-desktop-portal          # deskutils/xdg-desktop-portal
+xdg-desktop-portal-wlr      # deskutils/xdg-desktop-portal-wlr (screencast/screenshot)
+xdg-desktop-portal-gtk      # deskutils/xdg-desktop-portal-gtk (file chooser)
+gnome-keyring        # security/gnome-keyring (portal Secret backend)
+wayland              # graphics/wayland (client libs)
+libinput             # x11/libinput (sway input)
+
+# ── login manager (optional but recommended) ──
+greetd               # sysutils/greetd (OPTIONAL: may be absent on quarterly)
+tuigreet             # x11/tuigreet (OPTIONAL greeter UI for greetd)
+
+# ── terminal / bar / launcher / notifications ──
+foot                 # x11/foot
+waybar               # x11/waybar
+rofi                 # x11/rofi (Wayland support merged into main port)
+mako                 # x11/mako
+swayosd              # x11/swayosd (OPTIONAL: no-op fallback if missing)
+brightnessctl        # sysutils/brightnessctl
+wlsunset             # x11/wlsunset (night light)
+
+# ── screenshots / clipboard / input ──
+grim                 # x11/grim
+slurp                # x11/slurp
+satty                # graphics/satty (OPTIONAL annotate tool)
+wl-clipboard         # x11/wl-clipboard
+cliphist             # sysutils/cliphist
+wtype                # x11/wtype
+hyprpicker           # x11/hyprpicker (color picker)
+wf-recorder          # multimedia/wf-recorder (OPTIONAL screen recorder)
+wlr-randr            # x11/wlr-randr (output management)
+
+# ── audio: native OSS + optional PipeWire ──
+pipewire             # multimedia/pipewire (OPTIONAL: desktop audio routing)
+wireplumber          # multimedia/wireplumber (OPTIONAL pipewire session manager)
+pulsemixer           # audio/pulsemixer (mixer TUI; works with pipewire-pulse)
+pavucontrol          # audio/pavucontrol (OPTIONAL GTK mixer)
+
+# ── files / images / documents ──
+nautilus             # x11-fm/nautilus
+sushi                # x11-fm/sushi (OPTIONAL quick preview)
+imv                  # graphics/imv
+evince               # graphics/evince (PDF; "papers" on newer branches)
+gvfs                 # devel/gvfs (trash/mtp/smb for nautilus)
+udisks2              # sysutils/udisks2 (OPTIONAL automount helper)
+gnome-text-editor    # editors/gnome-text-editor
+ImageMagick7         # graphics/ImageMagick7 (magick(1) for wallpaper staging)
+qrencode             # graphics/qrencode (wifi-share QR)
+chafa                # graphics/chafa (terminal QR preview)
+tesseract            # graphics/tesseract (OCR)
+tesseract-data-eng   # graphics/tesseract-data (OPTIONAL eng traineddata)
+
+# ── browser ──
+chromium             # www/chromium (primary; helium-browser has no FreeBSD port)
+firefox              # www/firefox (fallback)
+
+# ── bluetooth: FreeBSD base stack (hccontrol/l2ping); BlueZ bluetoothctl does
+# NOT exist on FreeBSD, so waybar bluetooth + bluetooth-menu are best-effort
+# and degrade to "off" gracefully. No pkg needed.
+
+# ── shell / prompt / CLI ──
+bash                 # shells/bash (install.sh + scripts need bash)
+zsh                  # shells/zsh
+zsh-autosuggestions  # shells/zsh-autosuggestions
+zsh-syntax-highlighting  # shells/zsh-syntax-highlighting
+starship             # shells/starship
+atuin                # shells/atuin
+zoxide               # shells/zoxide
+fzf                  # textproc/fzf
+fd                   # sysutils/fd
+ripgrep              # textproc/ripgrep
+eza                  # sysutils/eza
+bat                  # sysutils/bat
+jq                   # textproc/jq
+tree                 # sysutils/tree
+tmux                 # sysutils/tmux
+neovim               # editors/neovim
+vim                  # editors/vim
+fastfetch            # sysutils/fastfetch (shows FreeBSD logo  by default)
+btop                 # sysutils/btop
+yazi                 # sysutils/yazi
+git                  # devel/git
+gh                   # devel/gh (GitHub CLI)
+gum                  # sysutils/gum (prompt helper for webapp scripts)
+curl                 # ftp/curl
+lsof                 # sysutils/lsof
+psmisc               # sysutils/psmisc (pkill/pidof)
+strace               # devel/strace (OPTIONAL; truss(1) is the base equivalent)
+yt-dlp               # www/yt-dlp
+cava                 # audio/cava (OPTIONAL visualizer)
+
+# ── fonts / themes ──
+dejavu               # x11-fonts/dejavu
+noto                 # x11-fonts/noto (base coverage; emoji below is best-effort)
+noto-emoji           # x11-fonts/noto-emoji (color emoji; skipped with warning if absent)
+terminus-font        # x11-fonts/terminus-font (console fallback)
+papirus-icon-theme   # misc/papirus-icon-theme
+adwaita-icon-theme   # x11-themes/adwaita-icon-theme
+nwg-look             # x11/nwg-look (GTK theme switcher)
+qt5-wayland          # x11-toolkits/qt5-wayland (OPTIONAL Qt Wayland)
+qt6-wayland          # x11-toolkits/qt6-wayland (OPTIONAL Qt Wayland)
+
+# ── toolchain (for cargo/pip fallbacks: matugen, awww, autotiling) ──
+rust                 # lang/rust (provides cargo for matugen/awww)
+python3              # lang/python3
+py-pillow            # graphics/py-pillow (OCR preprocessing)
+node                 # www/node (OPTIONAL)
+
+# ── privilege / utils ──
+doas                 # security/doas
+sudo                 # security/sudo
+xdg-user-dirs        # devel/xdg-user-dirs
+
+# NOTE — installed separately by install.sh (not via pkg):
+#   matugen     — `cargo install matugen` (no FreeBSD port; theming engine)
+#   awww        — `cargo install awww` (no FreeBSD port; falls back to swaybg)
+#   autotiling  — `pip install autotiling` / `pkg install py-autotiling` if present
+#   rofimoji    — `pip install rofimoji` (emoji picker backend)
+#   rofi-calc   — build from ports if available, else skip (calc menu degrades gracefully)
+#   voxtype     — Linux-only dictation; skipped on FreeBSD (binds become no-ops)
+#   power-profiles-daemon / powerprofilesctl — Linux-only; replaced by base powerd(8)
+#   NetworkManager/nmtui — replaced by native wlan(4)+wpa_supplicant(8); nm-* kept as
+#                          optional manual installs only

@@ -1,0 +1,33 @@
+# freebsd-config rc.conf(5) sample — merge into /etc/rc.conf with sysrc.
+# install.sh already enables the core set; this file documents the full
+# desktop block plus the per-machine wireless bits it cannot guess.
+#
+# Core desktop (managed by install.sh):
+#   sysrc dbus_enable=YES seatd_enable=YES powerd_enable=YES
+#   sysrc 'powerd_flags=-a hiadaptive -b adaptive'
+#   sysrc ntpd_enable=YES ntpd_sync_on_start=YES cron_enable=YES
+#   sysrc pf_enable=YES devfs_system_ruleset=freebsd_config
+#   sysrc bluetooth_enable=YES greetd_enable=YES   # greetd only if installed
+#
+# Graphics (pick ONE driver; also add to /boot/loader.conf):
+#   sysrc kld_list+="i915kms"        # Intel (13th-gen Iris Xe and similar)
+#   sysrc kld_list+="amdgpu"         # AMD
+#   sysrc kld_list+="nvidia-modeset" # NVIDIA (plus nvidia-drm port)
+#
+# Wireless (example for Intel iwm; replace iwm0 with your iface from pciconf):
+#   sysrc wlans_iwm0="wlan0"
+#   sysrc ifconfig_wlan0="WPA SYNCDHCP"
+#   sysrc wpa_supplicant_conf_file="/etc/wpa_supplicant.conf"
+# Wired (example):
+#   sysrc ifconfig_em0="SYNCDHCP"
+dbus_enable="YES"
+seatd_enable="YES"
+powerd_enable="YES"
+powerd_flags="-a hiadaptive -b adaptive"
+ntpd_enable="YES"
+ntpd_sync_on_start="YES"
+cron_enable="YES"
+pf_enable="YES"
+devfs_system_ruleset="freebsd_config"
+bluetooth_enable="YES"
+greetd_enable="YES"

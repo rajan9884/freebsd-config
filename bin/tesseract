@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# tesseract shim — resolves the OCR binary on any OS.
+# FreeBSD ports install `tesseract` to /usr/local/bin; some Linux distros
+# ship it as tesseract-ocr. Prefer PATH, then the known locations.
+for _t in "$HOME/.local/bin/tesseract-ocr" /usr/local/bin/tesseract /usr/bin/tesseract /usr/bin/tesseract-ocr; do
+    if [ -x "$_t" ]; then
+        exec "$_t" "$@"
+    fi
+done
+if command -v tesseract >/dev/null 2>&1 && [ "$(command -v tesseract)" != "$0" ]; then
+    exec tesseract "$@"
+fi
+echo "tesseract not found (pkg install tesseract)" >&2
+exit 127

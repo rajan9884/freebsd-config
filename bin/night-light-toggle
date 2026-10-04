@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Night light toggle — wlsunset on sway (FreeBSD 15.1).
+# hyprsunset is Hyprland/Linux-only and has no FreeBSD port; kept as a
+# last-resort branch for shared $HOME setups, sway path is the default.
+set -euo pipefail
+if command -v hyprsunset >/dev/null 2>&1 && [ -z "${SWAYSOCK:-}" ]; then
+    if pgrep -x hyprsunset >/dev/null; then
+        pkill -x hyprsunset
+        notify-send "Night Light" "Disabled"
+    else
+        hyprsunset --temperature 4000 &
+        disown
+        notify-send "Night Light" "Enabled (4000K)"
+    fi
+    exit 0
+fi
+exec "$HOME/.config/sway/scripts/night-light.sh"

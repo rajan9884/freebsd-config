@@ -1,0 +1,200 @@
+#!/usr/bin/env bash
+# Share the active Wi-Fi network via QR code + password (FreeBSD 15.1 ).
+# Native stack: ifconfig(8) wlan + wpa_supplicant.conf — no NetworkManager.
+# Renders with chafa image preview, otherwise keeps the PNG path.
+#
+# Usage: wifi-share [interface] [--password] [--copy]
+#   no flags  -> show QR + details, copy password to clipboard
+#   --password -> print only the PSK (for piping)
+#   --copy    -> copy password to clipboard without showing QR
+#
+# NOTE: PSKs live in /etc/wpa_supplicant.conf (root-only). Reading them tries
+# passwordless sudo/doas first; without privilege the script shows the SSID
+# and prints how to reveal the key from a terminal.
+set -euo pipefail
+
+interface=""
+only_password=false
+only_copy=false
+for arg in "$@"; do
+  case "$arg" in
+    --password) only_password=true ;;
+    --copy) only_copy=true ;;
+    *) interface=$arg ;;
+  esac
+done
+
+wifi_ifaces() {
+  ifconfig -l 2>/dev/null | tr ' ' '\n' | grep -E '^wlan[0-9]+$' || true
+}
+
+iface_ssid() { # iface_ssid <iface> -> associated SSID or empty
+  ifconfig "$1" 2>/dev/null | sed -n 's/.*ssid "\([^"]*\)".*/\1/p' | head -n 1
+}
+
+if [[ -z $interface ]]; then
+  # Prefer the associated interface carrying the default route.
+  default_if=$(route -n get default 2>/dev/null | awk '/interface:/{print $2; exit}' || true)
+  if [[ -n ${default_if:-} ]] && [[ $default_if == wlan* ]]; then
+    interface=$default_if
+  else
+    for _w in $(wifi_ifaces); do
+      if [[ -n $(iface_ssid "$_w") ]]; then
+        interface=$_w
+        break
+      fi
+    done
+    [[ -n ${interface:-} ]] || interface=$(wifi_ifaces | head -n 1 || true)
+  fi
+fi
+[[ -n ${interface:-} ]] || { echo "No Wi-Fi interface found (need wlans_<drv>=wlan0 in rc.conf)" >&2; exit 1; }
+
+ssid=$(iface_ssid "$interface" || true)
+[[ -n ${ssid:-} ]] || { echo "No active Wi-Fi connection on $interface" >&2; exit 1; }
+
+# Read the PSK for $ssid from wpa_supplicant.conf (root-only file).
+# Returns lines: security \n password \n hidden(yes/no)
+read_supplicant() { # read_supplicant <ssid> -> prints 3 lines or fails
+  local _ssid="$1" _conf="" _src=""
+  for _c in /etc/wpa_supplicant.conf "/etc/wpa_supplicant.conf.d/$interface.conf"; do
+    [[ -f $_c ]] || continue
+    if _src=$(cat "$_c" 2>/dev/null || sudo -n cat "$_c" 2>/dev/null || doas -n cat "$_c" 2>/dev/null); then
+      _conf="$_src"
+      break
+    fi
+  done
+  [[ -n $_conf ]] || return 1
+  # Pass the file via environment (never via shell expansion): PSKs may
+  # contain $, backticks or quotes that an unquoted heredoc would mangle.
+  SUPPLICANT_TEXT="$_conf" python3 - "$_ssid" <<'EOF' || return 1
+import sys, re, os
+want = sys.argv[1]
+text = os.environ.get('SUPPLICANT_TEXT', '')
+# Minimal network-block parser: split on lines, track brace depth.
+blocks, cur, depth = [], [], 0
+for line in text.splitlines():
+    s = line.strip()
+    if not s or s.startswith('#'):
+        continue
+    if re.match(r'network\s*=\s*\{', s):
+        cur, depth = [s], s.count('{') - s.count('}')
+        continue
+    if cur is not None:
+        cur.append(s)
+        depth += s.count('{') - s.count('}')
+        if depth <= 0:
+            blocks.append('\n'.join(cur))
+            cur = None
+for b in blocks:
+    m = re.search(r'ssid\s*=\s*"((?:[^"\\\\]|\\\\.)*)"', b)
+    if not m or m.group(1) != want:
+        continue
+    def field(name):
+        mm = re.search(name + r'\s*=\s*"((?:[^"\\\\]|\\\\.)*)"', b)
+        return mm.group(1) if mm else ''
+    def bare(name):
+        mm = re.search(r'(?m)^\s*' + name + r'\s*=\s*([^\s#}]+)', b)
+        return mm.group(1) if mm else ''
+    psk, km, hidden = field('psk'), bare('key_mgmt'), bare('scan_ssid')
+    print('WPA' if (psk or 'WPA' in km or 'WPA' in b) else ('WEP' if 'WEP' in b or 'wep_key0' in b else 'nopass'))
+    print(psk)
+    print('yes' if hidden == '1' else 'no')
+    sys.exit(0)
+sys.exit(1)
+EOF
+}
+
+security=""; password=""; hidden="no"; have_key=false
+if _info=$(read_supplicant "$ssid" 2>/dev/null); then
+  security=$(printf '%s' "$_info" | sed -n '1p')
+  password=$(printf '%s' "$_info" | sed -n '2p')
+  hidden=$(printf '%s' "$_info" | sed -n '3p')
+  have_key=true
+else
+  # Best-effort without the key file: open vs secured guess from authmode.
+  if ifconfig "$interface" 2>/dev/null | grep -qiE 'authmode +open|privacy +off'; then
+    security="nopass"
+  else
+    security="WPA"
+  fi
+fi
+[[ -n $security ]] || security="WPA"
+
+if $only_password; then
+  if ! $have_key || [[ -z ${password:-} ]]; then
+    if [[ $security == "nopass" ]]; then
+      echo "This network has no password" >&2; exit 1
+    fi
+    echo "Could not read the Wi-Fi password (needs root to read /etc/wpa_supplicant.conf):" >&2
+    echo "  sudo grep -A3 'ssid=\"$ssid\"' /etc/wpa_supplicant.conf" >&2
+    exit 1
+  fi
+  printf '%s\n' "$password"
+  exit 0
+fi
+
+copy_password() {
+  [[ $security == "nopass" ]] && return 0
+  [[ -z ${password:-} ]] && return 0
+  if command -v wl-copy &>/dev/null; then
+    printf '%s' "$password" | wl-copy
+  fi
+  if command -v notify-send &>/dev/null; then
+    notify-send -a "WiFi Share" -i network-wireless "Password copied" "$ssid"
+  fi
+}
+
+if $only_copy; then
+  [[ $security != "nopass" ]] || { echo "This network has no password" >&2; exit 1; }
+  if [[ -z ${password:-} ]]; then
+    echo "Could not read the Wi-Fi password (needs root to read /etc/wpa_supplicant.conf)." >&2
+    exit 1
+  fi
+  copy_password
+  echo "Password for '$ssid' copied to clipboard."
+  exit 0
+fi
+
+escape_wifi_qr() {
+  local value=$1
+  value=${value//\\/\\\\}
+  value=${value//;/\\;}
+  value=${value//,/\\,}
+  value=${value//:/\\:}
+  printf '%s' "$value"
+}
+
+if ! command -v qrencode >/dev/null 2>&1; then
+  echo "qrencode not found (pkg install qrencode)" >&2
+  exit 1
+fi
+
+payload="WIFI:T:$security;S:$(escape_wifi_qr "$ssid");P:$(escape_wifi_qr "${password:-}");"
+[[ $hidden == "yes" ]] && payload+="H:true;"
+payload+=";"
+
+png=$(mktemp "${TMPDIR:-/tmp}/wifi-qr-XXXXXX.png")
+trap 'rm -f "$png"' EXIT
+printf '%s' "$payload" | qrencode --margin 2 --size 10 --output "$png"
+
+echo "SSID:     $ssid"
+echo "Iface:    $interface"
+echo "Security: $security"
+if [[ -n ${password:-} ]]; then
+  echo "Password: $password (copied to clipboard)"
+else
+  if [[ $security == "nopass" ]]; then
+    echo "(open network — no password)"
+  else
+    echo "(password unreadable without root; QR carries SSID only)"
+    echo "  sudo grep -A3 'ssid=\"$ssid\"' /etc/wpa_supplicant.conf"
+  fi
+fi
+echo
+if command -v chafa &>/dev/null; then
+  chafa --symbols block "$png"
+else
+  echo "QR saved to: $png (trap disabled — file kept)"
+  trap - EXIT
+fi
+copy_password

@@ -1,0 +1,98 @@
+#!/bin/sh
+# start-sway — Wayland session entry point (FreeBSD 15.1 ).
+# Sourced by login (shell/zprofile on ttyv1) and by greetd's sway.desktop
+# (wrapped in dbus-run-session there). Safe to run by hand from a VT.
+
+# wayland/swayfx env vars
+# common settings
+export LIBSEAT_BACKEND=seatd
+export CLUTTER_BACKEND=wayland
+export DESKTOP_SESSION=sway
+export ELM_DISPLAY=wl
+export GDK_BACKEND=wayland,x11
+export MOZ_ENABLE_WAYLAND=1
+export QT_QPA_PLATFORM="wayland;xcb"
+export QT_QPA_PLATFORMTHEME="qt6ct;qt5ct"
+export SDL_VIDEODRIVER=wayland
+export XDG_CURRENT_DESKTOP=sway
+export XDG_SESSION_TYPE=wayland
+export XDG_SESSION_DESKTOP=sway
+export ELECTRON_OZONE_PLATFORM_HINT=wayland
+
+# FreeBSD runtime dir: login shells on a VT often lack XDG_RUNTIME_DIR
+# (Linux pam_systemd creates /run/user/$UID; FreeBSD does not). Sway,
+# PipeWire and waybar all need it — create a private one when missing.
+if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+    export XDG_RUNTIME_DIR="/var/run/user/$(id -u)"
+    if [ ! -d "$XDG_RUNTIME_DIR" ]; then
+        mkdir -p "$XDG_RUNTIME_DIR" 2>/dev/null || XDG_RUNTIME_DIR="${TMPDIR:-/tmp}/runtime-$(id -u)"
+        mkdir -p "$XDG_RUNTIME_DIR" 2>/dev/null || true
+    fi
+    chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
+fi
+
+# Ports prefix first so sway picks the ports mesa, libinput and friends.
+case ":$PATH:" in
+    *":/usr/local/bin:"*) ;;
+    *) export PATH="/usr/local/bin:$PATH" ;;
+esac
+
+# intel gpu specific (13th Gen Raptor Lake Iris Xe, iHD driver via drm-kmod)
+export LIBVA_DRIVER_NAME=iHD #i965 for old hw
+unset VDPAU_DRIVER
+#export VDPAU_DRIVER=va_gl
+
+# amd gpu specific (NOT this machine — uncomment only on AMD hardware)
+#export LIBVA_DRIVER_NAME=radeonsi
+#export VDPAU_DRIVER=radeonsi #r300 for old hw
+
+# nvidia gpu specific
+#export LIBVA_DRIVER_NAME=nvidia #nouveau for foss type
+#export VDPAU_DRIVER=nvidia #nouveau
+#export GBM_BACKEND=nvidia-drm
+#export __GLX_VENDOR_LIBRARY_NAME=nvidia
+#export __GL_VRR_ALLOWED=0
+
+# themes
+export QT_SELECT=Rosepine-Dark
+export QT_STYLE_OVERRIDE=Rosepine-Dark
+export QT_AUTO_SCREEN_SCALE_FACTOR=1
+export QT_WAYLAND_DISABLE_WINDOWDECORATION=1
+
+# cursor (Bibata-Modern-Ice @ 24px — must be set before sway starts)
+export XCURSOR_THEME=Bibata-Modern-Ice
+export XCURSOR_SIZE=24
+
+# xdg base dirs
+export XDG_CACHE_HOME="$HOME/.cache"
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_CONFIG_DIRS="${XDG_CONFIG_DIRS:-/etc/xdg:/usr/local/etc/xdg}"
+export XDG_DATA_HOME="$HOME/.local/share"
+export XDG_STATE_HOME="$HOME/.local/state"
+
+# xdg user dirs (standard locations, matching ~/.config/user-dirs.dirs)
+export XDG_DESKTOP_DIR="$HOME/Desktop"
+export XDG_DOCUMENTS_DIR="$HOME/Documents"
+export XDG_DOWNLOAD_DIR="$HOME/Downloads"
+export XDG_MUSIC_DIR="$HOME/Music"
+export XDG_PICTURES_DIR="$HOME/Pictures"
+export XDG_PUBLICSHARE_DIR="$HOME/Public"
+export XDG_TEMPLATES_DIR="$HOME/Templates"
+export XDG_VIDEOS_DIR="$HOME/Videos"
+
+# start swayfx (single session bus: pipewire is spawned by sway itself,
+# so everything shares one bus — never nest dbus-run-session twice).
+# Linux VTs are /dev/tty1; FreeBSD VTs are /dev/ttyv0-ttyv7.
+case "$(tty 2>/dev/null)" in
+    /dev/tty1|/dev/ttyv0|/dev/ttyv1)
+        if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && command -v dbus-run-session >/dev/null 2>&1; then
+            exec dbus-run-session -- sway "$@"
+        else
+            exec sway "$@"
+        fi
+        ;;
+    *)
+        # Already under a session bus (greetd) or ssh: just start sway.
+        exec sway "$@"
+        ;;
+esac

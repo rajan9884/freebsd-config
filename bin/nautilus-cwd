@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Open Files (nautilus) in the active terminal's current working directory.
+# Portable cwd resolution: /proc on Linux, procstat(1) on FreeBSD.
+set -euo pipefail
+
+resolve_cwd() { # resolve_cwd <pid> -> prints dir or nothing
+    local _pid="$1" _cwd=""
+    if [ -L "/proc/$_pid/cwd" ] || [ -d "/proc/$_pid/cwd" ]; then
+        if command -v realpath >/dev/null 2>&1; then
+            _cwd=$(realpath "/proc/$_pid/cwd" 2>/dev/null || true)
+        else
+            _cwd=$(readlink -f "/proc/$_pid/cwd" 2>/dev/null || true)
+        fi
+    elif command -v procstat >/dev/null 2>&1; then
+        _cwd=$(procstat -f "$_pid" 2>/dev/null | awk '$0 ~ / cwd / || $NF == "cwd" {print $NF; exit}' || true)
+        case "$_cwd" in /*) ;; *) _cwd="" ;; esac
+    fi
+    [ -n "$_cwd" ] && [ -d "$_cwd" ] && printf '%s' "$_cwd"
+}
+
+terminal_pid=$(swaymsg -t get_tree 2>/dev/null | jq -r '.. | objects | select(.focused == true) | .pid // empty' 2>/dev/null | head -n 1 || true)
+# Foot has no remote-control socket, so cwd comes from the PID tree below.
+cwd=""
+
+if [[ -z $cwd && -n ${terminal_pid:-} ]]; then
+  shell_pid=$(pgrep -P "$terminal_pid" 2>/dev/null | tail -n1 || true)
+  if [[ -n $shell_pid ]]; then
+    cwd=$(resolve_cwd "$shell_pid" || true)
+    # Only trust shells (not editors/TUIs): compare against /etc/shells.
+    # /proc exe links are Linux-only; on FreeBSD check the comm name.
+    shell_exe=""
+    if [ -L "/proc/$shell_pid/exe" ]; then
+        if command -v realpath >/dev/null 2>&1; then
+            shell_exe=$(realpath "/proc/$shell_pid/exe" 2>/dev/null || true)
+        else
+            shell_exe=$(readlink -f "/proc/$shell_pid/exe" 2>/dev/null || true)
+        fi
+    else
+        shell_exe=$(ps -o comm= -p "$shell_pid" 2>/dev/null | head -n1 || true)
+    fi
+    if ! grep -Fqsx "$shell_exe" /etc/shells 2>/dev/null \
+        && ! grep -Fqsx "/bin/$shell_exe" /etc/shells 2>/dev/null \
+        && ! grep -Fqsx "/usr/local/bin/$shell_exe" /etc/shells 2>/dev/null; then
+      case "$shell_exe" in
+        *zsh|*bash|*fish|*sh) ;;
+        *) cwd="" ;;
+      esac
+    fi
+  fi
+fi
+
+[[ -d $cwd ]] || cwd="$HOME"
+
+exec setsid "$HOME/.local/bin/nautilus-gnome" --new-window "$cwd"

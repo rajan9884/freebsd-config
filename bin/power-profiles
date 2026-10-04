@@ -1,0 +1,195 @@
+#!/usr/bin/env bash
+# Power profile manager for FreeBSD 15.1 (powerd(8) backend) .
+#
+#   power-profiles list                 profiles bottom-up (current first), "<profile><TAB><0|1>"
+#   power-profiles get                  current active profile
+#   power-profiles set <profile>        switch and remember for the current power source
+#   power-profiles autodetect           apply remembered/fallback profile for AC or battery
+#   power-profiles watch                autodetect once, then re-apply on AC plug/unplug
+#   power-profiles menu                 rofi switcher menu (power profile switcher)
+#
+# Linux power-profiles-daemon does not exist on FreeBSD. Profiles map to
+# powerd(8) CPU modes, applied via powerd_flags + service restart:
+#   performance  -> powerd maximum/maximum
+#   balanced     -> powerd hiadaptive(adaptive on battery)
+#   power-saver  -> powerd minimum/minimum
+# AC/battery state comes from sysctl hw.acpi.acline (1 = AC, 0 = battery).
+# Changing flags needs root: sudo/doas escalation is best-effort (flags are
+# still remembered per power source and applied at next privileged run).
+
+STATE_DIR="${POWER_PROFILES_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/power-profiles}"
+PROFILES="performance balanced power-saver"
+
+usage() {
+  echo "Usage: power-profiles [list|get|set <profile>|autodetect|watch|menu]" >&2
+  exit 1
+}
+
+current_profile() {
+  if [[ -r $STATE_DIR/current ]]; then
+    cat "$STATE_DIR/current"
+  else
+    echo "balanced"
+  fi
+}
+
+profile_available() {
+  local wanted=$1 p
+  for p in $PROFILES; do
+    [[ $p == "$wanted" ]] && return 0
+  done
+  return 1
+}
+
+on_battery() {
+  local acline
+  acline=$(sysctl -n hw.acpi.acline 2>/dev/null || echo 1)
+  [[ "$acline" == "0" ]]
+}
+
+powerd_flags_for() {
+  case "$1" in
+    performance) printf '%s' "-a maximum -b maximum" ;;
+    power-saver) printf '%s' "-a minimum -b minimum" ;;
+    *) printf '%s' "-a hiadaptive -b adaptive" ;;
+  esac
+}
+
+run_priv() {
+  if [ "$(id -u)" -eq 0 ]; then
+    "$@" && return 0
+    return 1
+  fi
+  if command -v sudo >/dev/null 2>&1 && sudo -n "$@" 2>/dev/null; then return 0; fi
+  if command -v doas >/dev/null 2>&1 && doas -n "$@" 2>/dev/null; then return 0; fi
+  return 1
+}
+
+apply_profile() { # apply_profile <profile> [remember_key]
+  local profile=$1 remember=${2:-}
+  local flags
+  flags=$(powerd_flags_for "$profile")
+  mkdir -p "$STATE_DIR"
+  printf '%s\n' "$profile" >"$STATE_DIR/current"
+  if [[ -n $remember ]]; then
+    printf '%s\n' "$profile" >"$STATE_DIR/$remember"
+  fi
+  # Apply to the running powerd when privileged; otherwise the flags are
+  # still persisted for the next boot/privileged run.
+  if run_priv sysrc "powerd_flags=$flags" >/dev/null 2>&1; then
+    run_priv service powerd restart >/dev/null 2>&1 || \
+      run_priv service powerd start >/dev/null 2>&1 || true
+  fi
+}
+
+do_autodetect() {
+  local key stored="" profile
+  if on_battery; then key=battery; else key=ac; fi
+  [[ -r $STATE_DIR/$key ]] && stored=$(<"$STATE_DIR/$key")
+  if [[ -n $stored ]] && profile_available "$stored"; then
+    profile=$stored
+  elif [[ $key == ac ]]; then
+    profile=performance
+  else
+    profile=balanced
+  fi
+  apply_profile "$profile"
+}
+
+list_profiles() {
+  local cur
+  cur=$(current_profile)
+  # Bottom-up with current first (same contract as the Linux version).
+  for p in power-saver balanced performance; do
+    if [[ $p == "$cur" ]]; then
+      printf '%s\t1\n' "$p"
+    else
+      printf '%s\t0\n' "$p"
+    fi
+  done
+}
+
+# Long-running watcher: apply once, then re-apply whenever the power source
+# flips. FreeBSD has no power_supply uevents: poll hw.acpi.acline (cheap
+# sysctl, 5s interval) — devd could push events, but polling also covers
+# sleep/resume races with zero setup. Single-instance via mkdir lockdir
+# (no flock(1) on FreeBSD base).
+cmd_watch() {
+  local lockdir="${XDG_RUNTIME_DIR:-/tmp}/power-profiles-watch.lockdir"
+  if [[ ${POWER_PROFILES_WATCH_LOCKED:-} != 1 ]]; then
+    if ! mkdir "$lockdir" 2>/dev/null; then
+      if [[ -n $(find "$lockdir" -maxdepth 0 -mmin +10 2>/dev/null) ]]; then
+        rm -rf "$lockdir" 2>/dev/null || true
+        mkdir "$lockdir" 2>/dev/null || exit 0
+      else
+        exit 0
+      fi
+    fi
+    # Hold the lock for the watcher's lifetime; release on exit/signals.
+    trap 'rmdir "$lockdir" 2>/dev/null; exit 0' HUP INT TERM EXIT
+    export POWER_PROFILES_WATCH_LOCKED=1
+  fi
+
+  do_autodetect || true
+
+  local last cur
+  if on_battery; then last=battery; else last=ac; fi
+
+  while true; do
+    sleep 5
+    if on_battery; then cur=battery; else cur=ac; fi
+    if [[ $cur != "$last" ]]; then
+      last=$cur
+      do_autodetect || true
+    fi
+  done
+}
+
+case "${1:-autodetect}" in
+  list|list-active)
+    list_profiles
+    ;;
+  get|current)
+    current_profile
+    ;;
+  set)
+    requested=${2:-}
+    [[ -n $requested ]] || usage
+    profile_available "$requested" || {
+      echo "Power profile is not available: $requested" >&2
+      exit 1
+    }
+    if on_battery; then SAVE_KEY=battery; else SAVE_KEY=ac; fi
+    apply_profile "$requested" "$SAVE_KEY"
+    ;;
+  autodetect)
+    do_autodetect
+    ;;
+  watch)
+    cmd_watch
+    ;;
+  menu)
+    THEME="$HOME/.config/rofi/active-scripts.rasi"
+    [[ -f "$THEME" ]] || THEME="$HOME/.config/rofi/theme.rasi"
+    current=$(current_profile)
+    entries=()
+    while read -r p active; do
+      [[ -z $p && -z $active ]] && continue
+      if [[ $active == 1 ]]; then
+        entries+=("$p (current)")
+      else
+        entries+=("$p")
+      fi
+    done < <(list_profiles)
+    choice=$(printf '%s\n' "${entries[@]}" | rofi -dmenu -p "Power Profile" -theme "$THEME")
+    [[ -z $choice ]] && exit 0
+    chosen=${choice%% *}
+    if [[ $chosen != "$current" ]]; then
+      if on_battery; then SAVE_KEY=battery; else SAVE_KEY=ac; fi
+      apply_profile "$chosen" "$SAVE_KEY"
+    fi
+    ;;
+  *)
+    usage
+    ;;
+esac

@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# ──────────────────────────────────────────────
+#   freebsd-power — power actions for rofi/waybar menus (FreeBSD 15.1 )
+#   Usage: freebsd-power lock|logout|suspend|reboot|poweroff|hibernate
+#
+#   FreeBSD has no loginctl/systemctl: shutdown(8) and zzz(8) do the work.
+#   S4 hibernation does not exist on FreeBSD, so `hibernate` suspends (S3)
+#   with a notice instead of failing.
+#
+#   Privilege: shutdown/zzz need root. Tries passwordless sudo/doas first
+#   (-n, works with cached credentials or nopass rules), then interactive
+#   escalation, then fails with a notification instead of hanging rofi.
+#   For fully passwordless menus, add to /usr/local/etc/doas.conf:
+#     permit nopass :wheel cmd shutdown
+#     permit nopass :wheel cmd zzz
+# ──────────────────────────────────────────────
+set -u
+
+notify() { notify-send -a "Power" -i system-shutdown "$1" "$2" 2>/dev/null || true; }
+
+# run_priv <command...>: sudo/doas escalation, passwordless first.
+run_priv() {
+    if [ "$(id -u)" -eq 0 ]; then
+        "$@" && return 0
+        return 1
+    fi
+    if command -v sudo >/dev/null 2>&1; then
+        if sudo -n "$@" 2>/dev/null; then return 0; fi
+        # Interactive sudo needs a TTY/password prompt; from rofi there is
+        # none, so only attempt it when stdin is a terminal.
+        if [ -t 0 ]; then
+            sudo "$@" && return 0
+        fi
+    fi
+    if command -v doas >/dev/null 2>&1; then
+        if doas -n "$@" 2>/dev/null; then return 0; fi
+        if [ -t 0 ]; then
+            doas "$@" && return 0
+        fi
+    fi
+    return 1
+}
+
+case "${1:-}" in
+    lock)
+        if [ -x "$HOME/.config/sway/scripts/lock.sh" ]; then
+            exec "$HOME/.config/sway/scripts/lock.sh"
+        else
+            exec swaylock -f
+        fi
+        ;;
+    logout)
+        swaymsg exit 2>/dev/null || true
+        ;;
+    suspend)
+        if command -v zzz >/dev/null 2>&1; then
+            run_priv zzz && exit 0
+        fi
+        # Fallback: direct ACPI S3 (same thing zzz does).
+        if run_priv acpiconf -s 3; then exit 0; fi
+        notify "Suspend failed" "Need privilege — add a nopass doas rule for zzz (see freebsd-power header)."
+        exit 1
+        ;;
+    reboot)
+        if run_priv shutdown -r now "reboot by $USER"; then exit 0; fi
+        notify "Reboot failed" "Need privilege — run 'shutdown -r now' from a terminal."
+        exit 1
+        ;;
+    poweroff|shutdown|halt)
+        if run_priv shutdown -p now "poweroff by $USER"; then exit 0; fi
+        notify "Shutdown failed" "Need privilege — run 'shutdown -p now' from a terminal."
+        exit 1
+        ;;
+    hibernate)
+        # FreeBSD does not implement S4 suspend-to-disk: suspend instead.
+        notify "No hibernation on FreeBSD" "Suspending (S3) instead."
+        exec "$0" suspend
+        ;;
+    *)
+        echo "Usage: freebsd-power lock|logout|suspend|reboot|poweroff|hibernate" >&2
+        exit 1
+        ;;
+esac

@@ -1,0 +1,14 @@
+# freebsd-config devfs.rules(5) — device access for a Sway desktop.
+# Appended to /etc/devfs.rules by install.sh, then activated with:
+#   sysrc devfs_system_ruleset=freebsd_config && service devfs restart
+# FreeBSD has no Linux input/_seatd groups; sway+seatd reach DRM, evdev and
+# sound nodes through the video group instead (install.sh adds you to it).
+[freebsd_config=10]
+add path 'dri/*' mode 0666 group video
+add path 'drm/*' mode 0666 group video
+add path 'input/*' mode 0660 group video
+add path 'dsp*' mode 0666
+add path 'mixer*' mode 0666
+add path 'sndstat' mode 0444
+add path 'usb/*' mode 0660 group operator
+add path 'video*' mode 0660 group video

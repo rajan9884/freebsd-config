@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Enable nautilus sushi Space-preview on sway by faking a GNOME session
+# (sushi previews only activate under a GNOME desktop id).
+export XDG_CURRENT_DESKTOP=GNOME
+export XDG_SESSION_DESKTOP=GNOME
+export DESKTOP_SESSION=gnome
+exec nautilus "$@"

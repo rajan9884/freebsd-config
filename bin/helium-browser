@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Launch Helium with the matugen theme applied on every start.
+#
+# NOTE (FreeBSD): helium-browser has no FreeBSD port. This wrapper prefers a
+# locally installed helium binary when present, and otherwise falls back to
+# chromium so every $browser keybind keeps working out of the box.
+for _b in "$HOME/.local/bin/helium" /usr/local/bin/helium-browser /usr/bin/helium-browser; do
+    if [ -x "$_b" ]; then
+        if [ -d "$HOME/.config/helium-theme" ]; then
+            exec "$_b" --load-extension="$HOME/.config/helium-theme" "$@"
+        else
+            exec "$_b" "$@"
+        fi
+    fi
+done
+exec "$HOME/.local/bin/chromium" "$@"

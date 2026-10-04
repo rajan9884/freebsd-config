@@ -1,0 +1,35 @@
+{
+    "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+    "logo": {
+        "source": "freebsd",
+        "color": {
+            "1": "red",
+            "2": "white"
+        }
+    },
+    "display": {
+        "separator": "  ",
+        "color": {
+            "keys": "red",
+            "title": "white"
+        }
+    },
+    "modules": [
+        "title",
+        "separator",
+        "os",
+        "host",
+        "kernel",
+        "uptime",
+        "packages",
+        "shell",
+        "display",
+        "de",
+        "wm",
+        "terminal",
+        "cpu",
+        "memory",
+        "break",
+        "colors"
+    ]
+}

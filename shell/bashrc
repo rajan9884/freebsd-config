@@ -1,0 +1,76 @@
+# ~/.bashrc — freebsd-config (FreeBSD 15.1 desktop).
+#
+# Guarded tool inits: a missing tool is skipped silently, so the shell always
+# starts clean even mid-install (nothing here may error).
+
+# If not running interactively, don't do anything
+[[ $- != *i* ]] && return
+
+# ── Aliases (FreeBSD: BSD ls colours via -G + CLICOLOR) ──
+case "$(uname -s)" in
+    FreeBSD|Darwin|*BSD) alias ls='ls -G' ;;
+    *) alias ls='ls --color=auto' ;;
+esac
+alias grep='grep --color=auto'
+alias ff="fzf --preview 'bat --color=always {}'"
+alias ll='ls -lt'
+alias ..='cd ../'
+# FreeBSD service helper (runit's vsv does not exist here).
+alias svc='sudo service'
+
+export CLICOLOR=1
+export LSCOLORS="exfxcxdxbxegedabagacad"
+
+# Dual-GitHub helpers: git-work / git-personal / git-whoami
+[ -f "$HOME/.config/zsh/git-accounts.sh" ] && source "$HOME/.config/zsh/git-accounts.sh"
+
+# ── Editor + fzf ──
+export FZF_DEFAULT_OPTS="--height 90% --reverse --border"
+export EDITOR="nvim" VISUAL="nvim"
+export TERMINAL="foot"
+
+# ── Speed tools (zoxide/fzf/yazi/atuin/direnv) ──
+if command -v zoxide >/dev/null 2>&1; then eval "$(zoxide init bash --cmd z)"; fi
+if command -v fzf >/dev/null 2>&1 && fzf --bash >/dev/null 2>&1; then
+    eval "$(fzf --bash)"
+else
+    for _fz in /usr/local/share/fzf/key-bindings.bash /usr/share/fzf/key-bindings.bash; do
+        [ -f "$_fz" ] && source "$_fz"
+    done
+    for _fz in /usr/local/share/fzf/completion.bash /usr/share/fzf/completion.bash; do
+        [ -f "$_fz" ] && source "$_fz"
+    done
+    unset _fz
+fi
+# Atuin owns Ctrl-R; fzf keeps Ctrl-T + Alt-C.
+if command -v atuin >/dev/null 2>&1; then eval "$(atuin init bash --disable-up-arrow)"; fi
+if command -v direnv >/dev/null 2>&1; then eval "$(direnv hook bash)"; fi
+# Starship LAST among prompt tools: atuin creates the precmd_functions array,
+# which makes starship take its bash-preexec branch and skip PROMPT_COMMAND —
+# but bash-preexec isn't installed, so that array is never dispatched and the
+# prompt never fires (bare bash-5.3$). Drive starship from PROMPT_COMMAND
+# directly, and drop the dead array entry so it can't double-render.
+if command -v starship >/dev/null 2>&1; then
+  eval "$(starship init bash)"
+  if declare -p precmd_functions &>/dev/null; then
+    for i in "${!precmd_functions[@]}"; do
+      [[ ${precmd_functions[$i]} == starship_precmd ]] && unset 'precmd_functions[i]'
+    done
+  fi
+  case ";$PROMPT_COMMAND;" in
+  *";starship_precmd;"*) ;;
+  *) PROMPT_COMMAND="starship_precmd${PROMPT_COMMAND:+;$PROMPT_COMMAND}" ;;
+  esac
+fi
+
+# yazi: `y` cds into the directory you exit in
+y() {
+  local tmp="$(mktemp "${TMPDIR:-/tmp}/yazi-cwd.XXXXXX")"
+  command yazi "$@" --cwd-file="$tmp"
+  local cwd="$(cat -- "$tmp" 2>/dev/null)"
+  rm -f -- "$tmp"
+  [ -n "$cwd" ] && [ "$cwd" != "$PWD" ] && cd -- "$cwd"
+}
+
+# ~/.local/bin carries the repo helpers (freebsd-wallpaper-picker, …).
+case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac
