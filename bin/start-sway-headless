@@ -9,5 +9,8 @@
 export WLR_BACKENDS=headless
 export WLR_HEADLESS_OUTPUTS=1
 export WLR_LIBINPUT_NO_DEVICES=1
+# Pixman (CPU) renderer: swayfx's GLES2 renderer needs a DRM FD, which
+# GPU-less guests don't have. pixman is unaccelerated but always works.
+export WLR_RENDERER=pixman
 export WLR_RENDERER_ALLOW_SOFTWARE=1
 exec "$(dirname "$0")/start-sway" "$@"
