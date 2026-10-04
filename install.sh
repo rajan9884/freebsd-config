@@ -310,8 +310,16 @@ link() { # link <source-in-repo> <destination>
     # Never write through a parent directory that itself links into the repo
     # (e.g. ~/.config/zsh -> freebsd-config/zsh): the file is already deployed
     # via the directory link, and touching it would mutate the repo.
-    local parent_real
-    parent_real="$(realpath -m "$(dirname "$dest")")"
+    # Portable canonicalization: realpath -m is GNU-only, plain realpath
+    # needs an existing path — gate on -d and fall back to the raw dirname
+    # (a nonexistent parent cannot be a symlink into the repo anyway).
+    local parent_dir parent_real
+    parent_dir="$(dirname "$dest")"
+    if [ -d "$parent_dir" ]; then
+        parent_real="$(realpath "$parent_dir" 2>/dev/null || printf '%s' "$parent_dir")"
+    else
+        parent_real="$parent_dir"
+    fi
     case "$parent_real/" in
         "$REPO_DIR/"*)
             log "  already covered by directory link, skipping: $dest"
